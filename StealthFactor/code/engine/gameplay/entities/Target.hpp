@@ -13,7 +13,7 @@ namespace engine
 			class Target : public Entity
 			{
 			public:
-				Target();
+				Target(EntityContext &context);
 				~Target();
 
 				virtual void update() override;
@@ -21,8 +21,8 @@ namespace engine
 				virtual void draw() override;
 
 			private:
-				graphics::ShapeList shapeList;
-				dGeomID collisionGeomId;
+				graphics::ShapeList _shapeList;
+				dGeomID _collisionGeomId;
 			};
 		}
 	}

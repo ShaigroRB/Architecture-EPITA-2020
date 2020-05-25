@@ -5,16 +5,16 @@
 #include <sstream>
 #include <pugixml/pugixml.hpp>
 #include <SFML/System.hpp>
-#include <engine/gameplay/GameplayManager.hpp>
-#include <engine/graphics/GraphicsManager.hpp>
-#include <engine/physics/PhysicsManager.hpp>
-#include <engine/input/InputManager.hpp>
 
 namespace engine
 {
-	Engine *Engine::instance = nullptr;
+	Engine::Engine()
+		: _gameplayManager{ _graphicsManager, _inputManager, _physicsManager }
+		, _graphicsManager{ *this, _gameplayManager }
+	{
+	}
 
-	void Engine::loadConfiguration()
+	bool Engine::loadConfiguration()
 	{
 		pugi::xml_document doc;
 		pugi::xml_parse_result result = doc.load_file("configuration.xml");
@@ -23,54 +23,97 @@ namespace engine
 		{
 			assert(!doc.empty());
 			auto configuration = doc.first_child();
-			startMap = configuration.child_value("start_map");
+			_startMap = configuration.child_value("start_map");
+
+			return true;
 		}
 		else
 		{
 			std::cerr << "Configuration parsed with errors." << std::endl;
 			std::cerr << "Error description: " << result.description() << std::endl;
 			std::cerr << "Error offset: " << result.offset << std::endl;
+
+			return false;
 		}
+	}
+
+	bool Engine::setUp()
+	{
+		if (!_graphicsManager.setUp())
+		{
+			return false;
+		}
+
+		if (!_physicsManager.setUp())
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	void Engine::tearDown()
+	{
+		_physicsManager.tearDown();
+		_graphicsManager.tearDown();
 	}
 
 	void Engine::run()
 	{
-		running = true;
+		_running = true;
 
-		gameplay::Manager::getInstance().loadMap(startMap);
+		_gameplayManager.loadMap(_startMap);
 
 		sf::Clock clock;
-		while (running)
+		while (_running)
 		{
-			deltaTime = clock.restart().asSeconds();
+			_deltaTime = clock.restart().asSeconds();
 
-			physics::Manager::getInstance().update();
-			gameplay::Manager::getInstance().update();
-			graphics::Manager::getInstance().update();
+			_inputManager.clear();
 
-			graphics::Manager::getInstance().clear();
+			_physicsManager.update();
+			_graphicsManager.update();
+			_gameplayManager.update();
 
-			gameplay::Manager::getInstance().draw();
+			_graphicsManager.clear();
 
-			graphics::Manager::getInstance().display();
+			_gameplayManager.draw();
+
+			_graphicsManager.display();
 		}
 	}
 
 	float Engine::getDeltaTime() const
 	{
-		return deltaTime;
+		return _deltaTime;
 	}
 
-	void Engine::exit()
+	void Engine::onEvent(const sf::Event &event)
 	{
-		running = false;
-	}
+		switch (event.type)
+		{
+		case sf::Event::Closed:
+			_running = false;
+			break;
 
-	Engine &Engine::getInstance()
-	{
-		if (!instance)
-			instance = new Engine();
+		case sf::Event::LostFocus:
+			_inputManager.setActive(false);
+			break;
 
-		return *instance;
+		case sf::Event::GainedFocus:
+			_inputManager.setActive(true);
+			break;
+
+		case sf::Event::KeyPressed:
+			_inputManager.onKeyPressed(event.key);
+			break;
+
+		case sf::Event::KeyReleased:
+			_inputManager.onKeyReleased(event.key);
+			break;
+
+		default:
+			break;
+		}
 	}
 }

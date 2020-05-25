@@ -6,43 +6,46 @@ namespace engine
 {
 	namespace physics
 	{
-		Manager *Manager::instance = nullptr;
-
 		Manager::Collision::Collision(dGeomID o1, dGeomID o2)
 			: o1{ o1 }
 			, o2{ o2 }
 		{
 		}
 
-		Manager::Manager()
+		bool Manager::setUp()
 		{
 			dInitODE();
 
-			spaceId = dHashSpaceCreate(0);
+			_spaceId = dHashSpaceCreate(0);
+			return _spaceId != nullptr;
 		}
 
-		Manager::~Manager()
+		void Manager::tearDown()
 		{
-			dSpaceDestroy(spaceId);
+			if (_spaceId != nullptr)
+			{
+				dSpaceDestroy(_spaceId);
+			}
+
 			dCloseODE();
 		}
 
 		void Manager::update()
 		{
-			frameCollisions.clear();
-			dSpaceCollide(spaceId, &frameCollisions, &Manager::nearCallback);
+			_frameCollisions.clear();
+			dSpaceCollide(_spaceId, &_frameCollisions, &Manager::nearCallback);
 		}
 
 		dSpaceID Manager::getSpaceId() const
 		{
-			return spaceId;
+			return _spaceId;
 		}
 
 		std::set<dGeomID> Manager::getCollisionsWith(dGeomID object) const
 		{
 			std::set<dGeomID> objectCollisions;
 
-			for (auto &collision : frameCollisions)
+			for (auto &collision : _frameCollisions)
 			{
 				if (collision.o1 == object)
 				{
@@ -59,16 +62,8 @@ namespace engine
 
 		void Manager::nearCallback(void *data, dGeomID o1, dGeomID o2)
 		{
-			auto &frameCollisions = *reinterpret_cast<Collisions *>(data);
-			frameCollisions.emplace_back(o1, o2);
-		}
-
-		Manager &Manager::getInstance()
-		{
-			if (!instance)
-				instance = new Manager();
-
-			return *instance;
+			auto &_frameCollisions = *reinterpret_cast<Collisions *>(data);
+			_frameCollisions.emplace_back(o1, o2);
 		}
 	}
 }

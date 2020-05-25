@@ -1,28 +1,40 @@
 #pragma once
 
 #include <string>
+#include <engine/EventListener.hpp>
+#include <engine/gameplay/GameplayManager.hpp>
+#include <engine/graphics/GraphicsManager.hpp>
+#include <engine/physics/PhysicsManager.hpp>
+#include <engine/input/InputManager.hpp>
 
 namespace engine
 {
-	class Engine
+	class Engine : public EventListener
 	{
 	public:
-		void loadConfiguration();
+		Engine();
+
+		bool loadConfiguration();
+
+		bool setUp();
+		void tearDown();
 
 		void run();
 		float getDeltaTime() const;
 
-		void exit();
-
-		static Engine &getInstance();
+		// EventListener
+		void onEvent(const sf::Event &event) override;
 
 	private:
-		bool running;
-		float deltaTime;
+		gameplay::Manager _gameplayManager;
+		graphics::Manager _graphicsManager;
+		input::Manager _inputManager;
+		physics::Manager _physicsManager;
+
+		bool _running;
+		float _deltaTime;
 
 		// Configuration
-		std::string startMap;
-
-		static Engine *instance;
+		std::string _startMap;
 	};
 }

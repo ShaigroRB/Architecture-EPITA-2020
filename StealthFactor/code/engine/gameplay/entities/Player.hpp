@@ -11,14 +11,14 @@ namespace engine
 			class Player : public Character
 			{
 			public:
-				Player();
+				Player(EntityContext &context);
 
 				virtual void update() override;
 
 				bool hasJustMoved() const;
 
 			private:
-				bool justMoved{ false };
+				bool _justMoved{ false };
 			};
 		}
 	}
