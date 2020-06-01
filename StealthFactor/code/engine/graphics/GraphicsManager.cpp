@@ -1,11 +1,11 @@
 #include "engine/graphics/GraphicsManager.hpp"
 
 #include <cassert>
-#include <SFML/Graphics/Shape.hpp>
 #include <SFML/Window/Event.hpp>
 #include <engine/input/InputManager.hpp>
-#include <engine/graphics/ShapeList.hpp>
-#include <engine/graphics/ViewProvider.hpp>
+#include <engine/graphics/Camera.hpp>
+#include <engine/graphics/ShapeListDescriptor.hpp>
+#include <engine/graphics/ShapeListInstance.hpp>
 #include <engine/gameplay/GameplayManager.hpp>
 #include <engine/Engine.hpp>
 
@@ -13,9 +13,12 @@ namespace engine
 {
 	namespace graphics
 	{
-		Manager::Manager(EventListener &eventListener, ViewProvider &viewProvider)
+		Manager::Manager(EventListener &eventListener)
 			: _eventListener{ eventListener }
-			, _viewProvider{ viewProvider }
+		{
+		}
+
+		Manager::~Manager()
 		{
 		}
 
@@ -35,10 +38,12 @@ namespace engine
 
 		void Manager::tearDown()
 		{
+			assert(_shapeListInstances.size() == 0);
+
 			_window.close();
 		}
 
-		void Manager::update()
+		void Manager::pollEvents()
 		{
 			sf::Event event;
 			while (_window.pollEvent(event))
@@ -47,26 +52,89 @@ namespace engine
 			}
 		}
 
-		void Manager::clear()
+		void Manager::draw()
 		{
 			_window.clear(sf::Color::Black);
 
-			sf::View view{ _viewProvider.getViewCenter(), sf::Vector2f{(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT} };
+			assert(_activeCamera);
+			sf::View view{ _activeCamera->getPosition(), sf::Vector2f{ (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT } };
 			_window.setView(view);
-		}
 
-		void Manager::draw(const ShapeList &shapeList, const sf::Transform &transform)
-		{
-			sf::RenderStates renderStates{ transform };
-			for (auto shape : shapeList.getShapes())
+			for (auto &instance : _shapeListInstances)
 			{
-				_window.draw(*shape, renderStates);
+				sf::RenderStates renderStates{ instance->transform };
+				for (auto &shape : instance->shapeList.getShapes())
+				{
+					_window.draw(*shape, renderStates);
+				}
 			}
+
+			_window.display();
 		}
 
-		void Manager::display()
+		CameraId Manager::createCamera()
 		{
-			_window.display();
+			auto camera{ new Camera() };
+			_cameras.insert(CameraPtr{ camera });
+			return camera;
+		}
+
+		void Manager::destroyCamera(CameraId id)
+		{
+			auto it = std::find_if(
+				std::begin(_cameras),
+				std::end(_cameras),
+				[id](const CameraPtr &camera)
+			{
+				return camera.get() == id;
+			});
+			assert(it != std::end(_cameras));
+			_cameras.erase(it);
+		}
+
+		void Manager::setCameraActive(CameraId id)
+		{
+			assert(id);
+			_activeCamera = id;
+		}
+
+		void Manager::setCameraPosition(CameraId id, const sf::Vector2f &position)
+		{
+			assert(id);
+			auto camera = id;
+			camera->setPosition(position);
+		}
+
+		ShapeListId Manager::createShapeListInstance(const std::string &name)
+		{
+			ShapeListDescriptor descriptor;
+			if (!descriptor.load(name))
+			{
+				return nullptr;
+			}
+
+			auto instance{ new ShapeListInstance{ descriptor, sf::Transform() } };
+			ShapeListInstancePtr instanceUPtr{ instance };
+
+			_shapeListInstances.insert(std::move(instanceUPtr));
+			return instance;
+		}
+
+		void Manager::destroyShapeListInstance(ShapeListId id)
+		{
+			auto it = std::find_if(std::begin(_shapeListInstances), std::end(_shapeListInstances), [id](const ShapeListInstancePtr &instance)
+			{
+				return instance.get() == id;
+			});
+			assert(it != std::end(_shapeListInstances));
+			_shapeListInstances.erase(it);
+		}
+
+		void Manager::setShapeListInstanceMatrix(ShapeListId id, const sf::Transform &matrix)
+		{
+			// TODO Optimize (kd-tree...)
+			ShapeListInstance *instance = id;
+			instance->transform = matrix;
 		}
 	}
 }

@@ -10,7 +10,7 @@ namespace engine
 {
 	Engine::Engine()
 		: _gameplayManager{ _graphicsManager, _inputManager, _physicsManager }
-		, _graphicsManager{ *this, _gameplayManager }
+		, _graphicsManager{ *this }
 	{
 	}
 
@@ -49,11 +49,14 @@ namespace engine
 			return false;
 		}
 
+		_gameplayManager.setUp();
+
 		return true;
 	}
 
 	void Engine::tearDown()
 	{
+		_gameplayManager.tearDown();
 		_physicsManager.tearDown();
 		_graphicsManager.tearDown();
 	}
@@ -72,14 +75,10 @@ namespace engine
 			_inputManager.clear();
 
 			_physicsManager.update();
-			_graphicsManager.update();
+			_graphicsManager.pollEvents();
 			_gameplayManager.update();
 
-			_graphicsManager.clear();
-
-			_gameplayManager.draw();
-
-			_graphicsManager.display();
+			_graphicsManager.draw();
 		}
 	}
 
@@ -116,4 +115,4 @@ namespace engine
 			break;
 		}
 	}
-}
+} // namespace engine

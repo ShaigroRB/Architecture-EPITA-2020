@@ -49,3 +49,20 @@ Open _build\StealthFactor.sln_, choose your target, and build.
 - Dependency inversion.
 - pImpl.
 - void\*: C-style pointer to user data.
+
+## Session #3
+
+- RAII.
+- Ownership.
+- std::unique_ptr.
+- std::shared_ptr.
+- Move semantics.
+- Interface with opaque structures through handlers.
+
+## Session #4
+
+- Specialization through inheritance.
+- Specialization through components, entity-component-system.
+- Camera system.
+- Separation between Model and View.
+- Visitor pattern.

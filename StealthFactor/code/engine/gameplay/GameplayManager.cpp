@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 #include <pugixml/pugixml.hpp>
-#include <engine/Engine.hpp>
-#include <engine/gameplay/entities/Enemy.hpp>
-#include <engine/gameplay/entities/Player.hpp>
-#include <engine/gameplay/entities/Target.hpp>
+#include <engine/gameplay/Prefab.hpp>
+#include <engine/gameplay/components/Camera.hpp>
+#include <engine/gameplay/components/Player.hpp>
+#include <engine/gameplay/components/Transform.hpp>
 
 namespace engine
 {
@@ -22,9 +22,18 @@ namespace engine
 		{
 		}
 
+		void Manager::setUp()
+		{
+		}
+
+		void Manager::tearDown()
+		{
+			removeEntities();
+		}
+
 		void Manager::update()
 		{
-			for (auto entity : _entities)
+			for (auto &entity : _entities)
 			{
 				entity->update();
 			}
@@ -37,21 +46,9 @@ namespace engine
 			}
 		}
 
-		void Manager::draw()
-		{
-			for (auto entity : _entities)
-			{
-				entity->draw();
-			}
-		}
-
 		void Manager::loadMap(const std::string &mapName)
 		{
-			for (auto entity : _entities)
-			{
-				delete entity;
-			}
-			_entities.clear();
+			removeEntities();
 
 			std::stringstream filename;
 			filename << "maps/" << mapName << ".xml";
@@ -72,51 +69,60 @@ namespace engine
 
 				for (auto &xmlElement : xmlMap.child("elements").children())
 				{
+					std::string prefabName;
+
 					if (!std::strcmp(xmlElement.name(), "enemy"))
 					{
-						int row = std::stoi(xmlElement.child_value("row"));
-						assert(row >= 0 && row < _rows);
-
-						int column = std::stoi(xmlElement.child_value("column"));
-						assert(column >= 0 && column < _columns);
-
-						std::string archetypeName = xmlElement.child_value("archetype");
-
-						auto entity = new entities::Enemy{ _context, archetypeName };
-						entity->setPosition(sf::Vector2f{ (column + 0.5f) * CELL_SIZE, (row + 0.5f) * CELL_SIZE });
-
-						_entities.insert(entity);
+						prefabName = xmlElement.child_value("prefab");
+					}
+					else if (!std::strcmp(xmlElement.name(), "player"))
+					{
+						prefabName = "player";
+					}
+					else if (!std::strcmp(xmlElement.name(), "target"))
+					{
+						prefabName = "target";
+					}
+					else
+					{
+						std::cerr << "Unknown prefab  [" << xmlElement.name() << "]." << std::endl;
+						continue;
 					}
 
-					if (!std::strcmp(xmlElement.name(), "player"))
+					std::unique_ptr<Prefab> prefab{ new Prefab{ prefabName} };
+					auto entity = prefab->instantiate(_context);
+
+					if (entity)
 					{
+						auto transform = entity->getComponent<components::Transform>();
+
 						int row = std::stoi(xmlElement.child_value("row"));
 						assert(row >= 0 && row < _rows);
 
 						int column = std::stoi(xmlElement.child_value("column"));
 						assert(column >= 0 && column < _columns);
 
-						auto entity = new entities::Player{ _context };
-						entity->setPosition(sf::Vector2f{ (column + 0.5f) * CELL_SIZE, (row + 0.5f) * CELL_SIZE });
+						transform->setPosition(sf::Vector2f{ (column + 0.5f) * CELL_SIZE, (row + 0.5f) * CELL_SIZE });
 
-						_entities.insert(entity);
-						_playerEntity = entity;
+						auto player = entity->getComponent<components::Player>();
+						if (player)
+						{
+							_playerComponent = player;
+						}
+
+						_entities.insert(std::move(entity));
 					}
-
-					if (!std::strcmp(xmlElement.name(), "target"))
+					else
 					{
-						int row = std::stoi(xmlElement.child_value("row"));
-						assert(row >= 0 && row < _rows);
-
-						int column = std::stoi(xmlElement.child_value("column"));
-						assert(column >= 0 && column < _columns);
-
-						auto entity = new entities::Target{ _context };
-						entity->setPosition(sf::Vector2f{ (column + 0.5f) * CELL_SIZE, (row + 0.5f) * CELL_SIZE });
-
-						_entities.insert(entity);
+						std::cerr << "Prefab [" << prefabName << "] instantiated no entity." << std::endl;
 					}
 				}
+
+				std::unique_ptr<Prefab> cameraPrefab{ new Prefab{ "camera" } };
+				auto cameraEntity = cameraPrefab->instantiate(_context);
+				cameraEntity->getComponent<components::Camera>()->setActive();
+				cameraEntity->getComponent<components::Transform>()->setPosition(sf::Vector2f{ _columns * (CELL_SIZE / 2.f), _rows * (CELL_SIZE / 2.f) });
+				_entities.insert(std::move(cameraEntity));
 
 				_currentMapName = mapName;
 				_nextMapName = xmlMap.child_value("next_map");
@@ -147,15 +153,16 @@ namespace engine
 			}
 		}
 
-		const entities::Player &Manager::getPlayer() const
+		const components::Player &Manager::getPlayer() const
 		{
-			assert(_playerEntity);
-			return *_playerEntity;
+			assert(_playerComponent);
+			return *_playerComponent;
 		}
 
-		sf::Vector2f Manager::getViewCenter() const
+		void Manager::removeEntities()
 		{
-			return sf::Vector2f{ _columns * (CELL_SIZE / 2.f), _rows * (CELL_SIZE / 2.f) };
+			_entities.clear();
+			_playerComponent = nullptr;
 		}
 	}
 }
